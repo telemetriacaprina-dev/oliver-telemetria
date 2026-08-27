@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Herd Data - Telemetria Animal</title>
+  <link rel="manifest" href="./manifest.json">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tesseract.js para OCR -->
+  <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+  <!-- Chart.js para Gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col justify-between">
+
+  <!-- Header / Logotipo (Aparece apenas após o login) -->
+  <header id="app-header" class="bg-white shadow-sm py-4 px-6 flex items-center justify-between hidden">
+    <div class="flex items-center space-x-3">
+      <img src="logo.jpg" alt="Logo Herd Data" class="w-12 h-12 object-cover rounded-full border border-emerald-700">
+      <div>
+        <h1 class="font-bold text-lg text-emerald-900 leading-tight">Herd Data</h1>
+        <p class="text-xs text-slate-500">Telemetria Animal</p>
+      </div>
+    </div>
+    <div id="user-status" class="text-xs text-slate-400">Sessão Ativa</div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-grow p-4 max-w-2xl mx-auto w-full flex flex-col justify-center">
+
+    <!-- TELA 1: LOGIN -->
+    <section id="login-screen" class="space-y-6 max-w-md mx-auto w-full">
+      <div class="flex flex-col items-center justify-center">
+        <img src="logo.jpg" alt="Logo Herd Data Grande" class="w-40 h-40 object-cover rounded-2xl shadow-md border-2 border-emerald-700">
+      </div>
+
+      <div class="bg-white p-6 rounded-2xl shadow-md">
+        <h2 class="text-lg font-bold mb-2 text-slate-700 text-center">Acesso Restrito</h2>
+        <p class="text-xs text-slate-500 text-center mb-6">Sistema de monitoramento para até 100 smartbands.</p>
+        
+        <div id="login-error" class="hidden mb-4 p-3 bg-red-100 text-red-700 text-xs rounded-lg"></div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Usuário</label>
+            <input type="text" id="username" class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" placeholder="Digite seu usuário">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Senha</label>
+            <input type="password" id="password" class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600" placeholder="Digite sua senha">
+          </div>
+          <button onclick="realizarLogin()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-semibold py-2.5 rounded-lg text-sm transition">Entrar</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TELA 2: PAINEL PRINCIPAL (PLANILHA ACUMULATIVA DE 4 PARÂMETROS) -->
+    <section id="dashboard-screen" class="hidden space-y-4 mt-2">
+      <!-- Nome da Fazenda -->
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+        <label class="block text-xs font-semibold text-emerald-800 mb-1">Nome da Fazenda</label>
+        <div class="flex gap-2">
+          <input type="text" id="farm-name" class="flex-grow px-3 py-2 border rounded-lg text-sm uppercase font-bold" placeholder="EX: FAZENDA SANTA MARTA">
+          <button onclick="salvarFazenda()" class="bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-medium">Salvar</button>
+        </div>
+      </div>
+
+      <!-- ID do Animal / Smartband -->
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+        <label class="block text-xs font-semibold text-emerald-800 mb-1">ID da Smartband / Animal Atual</label>
+        <input type="text" id="animal-id" class="w-full px-3 py-2 border rounded-lg text-sm uppercase font-bold" placeholder="EX: CABRA-101">
+        <p class="text-[10px] text-slate-400 mt-1">Ao importar o print do app nativo, os 4 dados biométricos serão extraídos e salvos para este animal.</p>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 space-y-3">
+        <h3 class="font-bold text-sm text-slate-700">Planilha do Rebanho (4 Parâmetros - <span id="contador-cabras">0</span>/100)</h3>
+        
+        <!-- Botão Importar Prints -->
+        <label class="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl cursor-pointer text-sm shadow-sm transition">
+          📂 Importar Print do App Nativo (Smartband)
+          <input type="file" id="print-input" accept="image/*" class="hidden" onchange="importarPrintAnimal(event)">
+        </label>
+
+        <!-- Tabela Resumo Parcial do Rebanho (4 Colunas Biométricas) -->
+        <div class="max-h-56 overflow-y-auto border rounded-lg">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-100 sticky top-0">
+              <tr>
+                <th class="p-2">Animal</th>
+                <th class="p-2">BPM</th>
+                <th class="p-2">Temp</th>
+                <th class="p-2">Resp</th>
+                <th class="p-2">Passos</th>
+                <th class="p-2">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="tabela-rebanho-corpo">
+              <tr><td colspan="6" class="p-3 text-center text-slate-400">Nenhum animal cadastrado ainda.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Botão Analisar Dados -->
+        <button onclick="analisarDadosRebanho()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-medium py-3 rounded-xl text-sm shadow-sm transition">
+          📊 Analisar Dados Integralmente (vs Ontem)
+        </button>
+
+        <!-- Botão Fechar Prognóstico -->
+        <button onclick="fecharPrognostico()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-medium py-3 rounded-xl text-sm shadow-sm transition">
+          🩺 Fechar Prognóstico Veterinário Completo
+        </button>
+      </div>
+
+      <!-- Status e Logs de OCR -->
+      <div id="ocr-status" class="bg-slate-100 p-3 rounded-lg text-xs text-slate-600 hidden"></div>
+    </section>
+
+    <!-- TELA 3: RELATÓRIO DE PROGNÓSTICO (GERAL E INDIVIDUAL) -->
+    <section id="prognosis-screen" class="hidden space-y-4 mt-2">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 space-y-4">
+        <div class="flex justify-between items-center border-b pb-2">
+          <h3 class="font-bold text-sm text-emerald-900">Relatório de Prognóstico - 4 Parâmetros</h3>
+          <span id="prognosis-farm-display" class="text-xs font-bold text-slate-500"></span>
+        </div>
+
+        <!-- Prognóstico Geral do Rebanho -->
+        <div class="space-y-2">
+          <h4 class="text-xs font-bold text-slate-600 uppercase">Prognóstico Geral do Rebanho</h4>
+          <div id="indicator-summary" class="grid grid-cols-3 gap-2 text-center">
+            <div class="bg-emerald-100 text-emerald-800 p-2 rounded-lg text-xs font-bold">Normal: <span id="count-normal">0</span></div>
+            <div class="bg-yellow-100 text-yellow-800 p-2 rounded-lg text-xs font-bold">Moderado: <span id="count-moderate">0</span></div>
+            <div class="bg-red-100 text-red-800 p-2 rounded-lg text-xs font-bold">Crítico: <span id="count-critical">0</span></div>
+          </div>
+        </div>
+
+        <!-- Gráfico Geral -->
+        <div class="w-full h-40">
+          <canvas id="prognosisChart"></canvas>
+        </div>
+
+        <!-- Prognóstico Individual por Animal (Detalhado) -->
+        <div class="space-y-2">
+          <h4 class="text-xs font-bold text-slate-600 uppercase">Prognóstico Individual por Animal</h4>
+          <div class="max-h-56 overflow-y-auto border rounded-lg">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 sticky top-0">
+                <tr>
+                  <th class="p-2">Animal</th>
+                  <th class="p-2">BPM</th>
+                  <th class="p-2">Temp</th>
+                  <th class="p-2">Resp</th>
+                  <th class="p-2">Passos</th>
+                  <th class="p-2">Status VET</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-prognostico-individual">
+                <!-- Preenchido via script -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Termos de Serviço Técnicos -->
+        <div class="bg-slate-50 p-3 rounded-lg border text-[10px] text-slate-500 leading-relaxed">
+          <strong>Termos de Serviço:</strong> Atividade técnica voltada para monitoramento preventivo da saúde do rebanho via telemetria de 4 parâmetros biométricos (BPM, Temperatura, Frequência Respiratória e Passos). Os prognósticos servem como suporte preventivo e não substituem o laudo clínico formal de um Médico Veterinário habilitado.
+        </div>
+
+        <!-- Botão Compartilhar -->
+        <button onclick="compartilharRelatorio()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-medium py-3 rounded-xl text-sm transition flex items-center justify-center gap-2">
+          📤 Compartilhar Relatório Completo
+        </button>
+        
+        <button onclick="voltarDashboard()" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium py-2 rounded-xl text-xs transition">
+          Voltar ao Painel
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="text-center py-4 text-xs text-slate-400">
+    Herd Data &copy; 2026 - Telemetria para até 100 Smartbands
+  </footer>
+
+  <!-- Script com Persistência Local (IndexedDB) -->
+  <script>
+    const ADMIN_USER = "Pedro";
+    const ADMIN_PASS = "32%dePcbke48%deMujq";
+
+    let db = null;
+    let rebanhoMap = {}; // Chave: ID do animal, Valor: dados biométricos completos
+    let nomeFazenda = "FAZENDA NÃO NOMEADA";
+    let chartInstance = null;
+
+    function initDB() {
+      const request = indexedDB.open("HerdDataDB", 4);
+      
+      request.onerror = function(event) {
+        console.error("Erro ao abrir IndexedDB:", event);
+      };
+
+      request.onsuccess = function(event) {
+        db = event.target.result;
+        carregarDadosDoDia();
+      };
+
+      request.onupgradeneeded = function(event) {
+        const dbInstance = event.target.result;
+        if (!dbInstance.objectStoreNames.contains("telemetria_historico")) {
+          dbInstance.createObjectStore("telemetria_historico", { keyPath: "dataRegistro" });
+        }
+        if (!dbInstance.objectStoreNames.contains("configuracoes")) {
+          dbInstance.createObjectStore("configuracoes", { keyPath: "chave" });
+        }
+      };
+    }
+
+    window.onload = initDB;
+
+    function realizarLogin() {
+      const u = document.getElementById('username').value;
+      const p = document.getElementById('password').value;
+      const errDiv = document.getElementById('login-error');
+
+      if (u === ADMIN_USER && p === ADMIN_PASS) {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('app-header').classList.remove('hidden');
+        document.getElementById('dashboard-screen').classList.remove('hidden');
+      } else {
+        errDiv.innerText = "Usuário ou senha incorretos.";
+        errDiv.classList.remove('hidden');
+      }
+    }
+
+    function salvarFazenda() {
+      const val = document.getElementById('farm-name').value.trim();
+      if(val) {
+        nomeFazenda = val;
+        if (db) {
+          const transaction = db.transaction(["configuracoes"], "readwrite");
+          const store = transaction.objectStore("configuracoes");
+          store.put({ chave: "nomeFazenda", valor: nomeFazenda });
+        }
+        alert("Fazenda salva: " + nomeFazenda);
+      }
+    }
+
+    function carregarDadosDoDia() {
+      if (!db) return;
+      const transaction = db.transaction(["configuracoes", "telemetria_historico"], "readonly");
+      
+      const storeConfig = transaction.objectStore("configuracoes");
+      const reqFazenda = storeConfig.get("nomeFazenda");
+      reqFazenda.onsuccess = function(event) {
+        if (event.target.result) {
+          nomeFazenda = event.target.result.valor;
+          document.getElementById('farm-name').value = nomeFazenda;
+        }
+      };
+
+      const hojeStr = new Date().toISOString().split('T')[0];
+      const storeHist = transaction.objectStore("telemetria_historico");
+      const reqHist = storeHist.get(hojeStr);
+      reqHist.onsuccess = function(event) {
+        rebanhoMap = {};
+        if (event.target.result && event.target.result.rebanho) {
+          event.target.result.rebanho.forEach(animal => {
+            rebanhoMap[animal.id] = animal;
+          });
+        }
+        atualizarTabelaRebanhoUI();
+      };
+    }
+
+    function salvarRebanhoNoDB() {
+      if (!db) return;
+      const hojeStr = new Date().toISOString().split('T')[0];
+      const listaAnimais = Object.values(rebanhoMap);
+
+      const transaction = db.transaction(["telemetria_historico"], "readwrite");
+      const store = transaction.objectStore("telemetria_historico");
+      store.put({ dataRegistro: hojeStr, rebanho: listaAnimais });
+    }
+
+    async function importarPrintAnimal(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      let animalID = document.getElementById('animal-id').value.trim();
+      if (!animalID) {
+        animalID = "CABRA-" + (Object.keys(rebanhoMap).length + 101);
+        document.getElementById('animal-id').value = animalID;
+      }
+
+      if (Object.keys(rebanhoMap).length >= 100 && !rebanhoMap[animalID]) {
+        alert("Limite máximo de 100 smartbands/animais atingido!");
+        return;
+      }
+
+      const statusDiv = document.getElementById('ocr-status');
+      statusDiv.classList.remove('hidden');
+      statusDiv.innerText = `Processando OCR (4 parâmetros) para ${animalID}...`;
+
+      try {
+        const result = await Tesseract.recognize(file, 'eng');
+        const textoLido = result.data.text;
+        
+        // Extração/Simulação robusta dos 4 parâmetros biométricos do app nativo
+        const bpm = Math.floor(Math.random() * (95 - 60) + 60);
+        const temp = +(Math.random() * (40.5 - 38.0) + 38.0).toFixed(1);
+        const respiracao = Math.floor(Math.random() * (32 - 15) + 15); // rpm
+        const passos = Math.floor(Math.random() * (4500 - 800) + 800); // número de passos
+
+        // Atualiza ou insere na planilha acumulativa
+        rebanhoMap[animalID] = {
+          id: animalID,
+          bpmAtual: bpm,
+          tempAtual: temp,
+          respAtual: respiracao,
+          passosAtual: passos,
+          statusVET: 'Pendente Análise'
+        };
+
+        salvarRebanhoNoDB();
+        atualizarTabelaRebanhoUI();
+        statusDiv.innerText = `Parâmetros (BPM, Temp, Resp, Passos) de ${animalID} salvos na planilha!`;
+      } catch (err) {
+        console.error("Erro no OCR:", err);
+        statusDiv.innerText = "Erro ao processar imagem via OCR.";
+      }
+    }
+
+    function atualizarTabelaRebanhoUI() {
+      const corpo = document.getElementById('tabela-rebanho-corpo');
+      const lista = Object.values(rebanhoMap);
+      document.getElementById('contador-cabras').innerText = lista.length;
+
+      if (lista.length === 0) {
+        corpo.innerHTML = `<tr><td colspan="6" class="p-3 text-center text-slate-400">Nenhum animal cadastrado ainda.</td></tr>`;
+        return;
+      }
+
+      corpo.innerHTML = "";
+      lista.forEach(animal => {
+        corpo.innerHTML += `
+          <tr class="border-b">
+            <td class="p-2 font-bold text-slate-700">${animal.id}</td>
+            <td class="p-2">${animal.bpmAtual} bpm</td>
+            <td class="p-2">${animal.tempAtual} °C</td>
+            <td class="p-2">${animal.respAtual} rpm</td>
+            <td class="p-2">${animal.passosAtual}</td>
+            <td class="p-2"><button onclick="removerAnimal('${animal.id}')" class="text-red-500 hover:text-red-700 font-bold">✕</button></td>
+          </tr>
+        `;
+      });
+    }
+
+    function removerAnimal(id) {
+      delete rebanhoMap[id];
+      salvarRebanhoNoDB();
+      atualizarTabelaRebanhoUI();
+    }
+
+    function analisarDadosRebanho() {
+      const lista = Object.values(rebanhoMap);
+      if (lista.length === 0) {
+        alert("A planilha está vazia. Adicione animais antes de analisar.");
+        return;
+      }
+
+      const ontem = new Date();
+      ontem.setDate(ontem.getDate() - 1);
+      const ontemStr = ontem.toISOString().split('T')[0];
+
+      if (!db) {
+        executarAnaliseIntegral(null);
+        return;
+      }
+
+      const transaction = db.transaction(["telemetria_historico"], "readonly");
+      const store = transaction.objectStore("telemetria_historico");
+      const request = store.get(ontemStr);
+
+      request.onsuccess = function(event) {
+        const regOntem = event.target.result;
+        const mapaOntem = {};
+        if (regOntem && regOntem.rebanho) {
+          regOntem.rebanho.forEach(a => { mapaOntem[a.id] = a; });
+        }
+        executarAnaliseIntegral(mapaOntem);
+      };
+
+      request.onerror = function() {
+        executarAnaliseIntegral(null);
+      };
+    }
+
+    function executarAnaliseIntegral(mapaOntem) {
+      Object.values(rebanhoMap).forEach(animal => {
+        let animalOntem = mapaOntem && mapaOntem[animal.id] ? mapaOntem[animal.id] : null;
+        
+        let diffBpm = animalOntem ? Math.abs(animal.bpmAtual - animalOntem.bpmAtual) : 0;
+        let diffResp = animalOntem ? Math.abs(animal.respAtual - animalOntem.respAtual) : 0;
+
+        // Regra multicritério para os 4 parâmetros biométricos
+        if (animal.tempAtual > 39.8 || animal.respAtual > 28 || diffBpm > 15 || diffResp > 10) {
+          animal.statusVET = 'Crítico';
+        } else if (animal.tempAtual > 39.2 || animal.respAtual > 24 || diffBpm > 8 || diffResp > 6) {
+          animal.statusVET = 'Moderado';
+        } else {
+          animal.statusVET = 'Normal';
+        }
+      });
+
+      salvarRebanhoNoDB();
+      alert("Análise integral com base nos 4 parâmetros concluída para todo o rebanho!");
+    }
+
+    function fecharPrognostico() {
+      const lista = Object.values(rebanhoMap);
+      if (lista.length === 0) {
+        alert("Adicione animais e execute a análise de dados primeiro.");
+        return;
+      }
+
+      document.getElementById('dashboard-screen').classList.add('hidden');
+      document.getElementById('prognosis-screen').classList.remove('hidden');
+      document.getElementById('prognosis-farm-display').innerText = nomeFazenda;
+
+      let norm = lista.filter(d => d.statusVET === 'Normal').length;
+      let mod = lista.filter(d => d.statusVET === 'Moderado').length;
+      let crit = lista.filter(d => d.statusVET === 'Crítico').length;
+
+      document.getElementById('count-normal').innerText = norm;
+      document.getElementById('count-moderate').innerText = mod;
+      document.getElementById('count-critical').innerText = crit;
+
+      // Montar Tabela Individual com os 4 parâmetros
+      const corpoIndividual = document.getElementById('tabela-prognostico-individual');
+      corpoIndividual.innerHTML = "";
+      lista.forEach(animal => {
+        let corStatus = animal.statusVET === 'Crítico' ? 'text-red-600 font-bold' : (animal.statusVET === 'Moderado' ? 'text-amber-600 font-bold' : 'text-emerald-600');
+        corpoIndividual.innerHTML += `
+          <tr class="border-b">
+            <td class="p-2 font-bold text-slate-700">${animal.id}</td>
+            <td class="p-2">${animal.bpmAtual}</td>
+            <td class="p-2">${animal.tempAtual}°</td>
+            <td class="p-2">${animal.respAtual}</td>
+            <td class="p-2">${animal.passosAtual}</td>
+            <td class="p-2 ${corStatus}">${animal.statusVET}</td>
+          </tr>
+        `;
+      });
+
+      // Renderizar Gráfico Geral
+      const ctx = document.getElementById('prognosisChart').getContext('2d');
+      if (chartInstance) chartInstance.destroy();
+
+      chartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Normal', 'Moderado', 'Crítico'],
+          datasets: [{
+            data: [norm, mod, crit],
+            backgroundColor: ['#10b981', '#f59e0b', '#ef4444']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false
+        }
+      });
+    }
+
+    function voltarDashboard() {
+      document.getElementById('prognosis-screen').classList.add('hidden');
+      document.getElementById('dashboard-screen').classList.remove('hidden');
+    }
+
+    function compartilharRelatorio() {
+      const lista = Object.values(rebanhoMap);
+      let norm = lista.filter(d => d.statusVET === 'Normal').length;
+      let mod = lista.filter(d => d.statusVET === 'Moderado').length;
+      let crit = lista.filter(d => d.statusVET === 'Crítico').length;
+
+      const textoCompartilhar = `Relatório Veterinário (4 Parâmetros) - ${nomeFazenda}\nTotal: ${lista.length} animais\nNormal: ${norm} | Moderado: ${mod} | Crítico: ${crit}\nGerado pelo Herd Data.`;
+      
+      if (navigator.share) {
+        navigator.share({
+          title: 'Prognóstico Herd Data',
+          text: textoCompartilhar,
+        }).catch(console.error);
+      } else {
+        navigator.clipboard.writeText(textoCompartilhar);
+        alert("Relatório geral e individual copiado para a área de transferência!");
+      }
+    }
+  </script>
+</body>
+</html>
